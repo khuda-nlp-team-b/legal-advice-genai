@@ -2,8 +2,6 @@
 import os
 from dotenv import load_dotenv
 import create_db as cdb
-from langchain_teddynote import logging
-logging.langsmith(os.getenv('LANGCHAIN_PROJECT'))
 
 load_dotenv()
 
@@ -14,17 +12,5 @@ password = os.getenv('DB_PASSWORD')
 db = os.getenv('DB_NAME')
 api_key = os.getenv('OPENAI_API_KEY')
 
-
-cdb.create_db()
-cdb.retrieve_db('지훈이가 어제 노트북으로 나를 가격했어.')
-
-'''# 데이터베이스에서 판례 데이터프레임 로드
-df_판례 = u.load_df(host, port, username, password, db)
-print(df_판례.columns)
-
-# RAG용 벡터 DB 생성
-case_type = '형사'  # 예시로 '형사' 사건 유형을 선택
-u.build_rag_db_by_case_type(df_판례, case_type, api_key)
-
-# 쿼리 예시
-u.search_law_rag(query='지훈이가 나를 때렸어',case_type=case_type, api_key=api_key)'''
+#cdb.create_db(api_key)
+cdb.retrieve_db('누가 내 돈을 가지고 다른 곳에 투자하여서 모두 소진했어.',host,port,username,password,db,api_key)
