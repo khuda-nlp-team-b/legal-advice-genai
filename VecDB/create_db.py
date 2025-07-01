@@ -84,7 +84,7 @@ def create_db(api_key,base_db_dir='./db'):
      # 자식 청크를 저장할 벡터스토어 생성
     print('벡터스토어 생성 중...')
     total_docs = len(split_docs)
-    print(f'총 {total_docs}개의 문서를 처리합니다...')
+    print(f'총 {len(split_docs)}개의 문서를 {total_docs}개의 청크로 처리합니다...')
     
     # 배치 크기 설정 (메모리 관리를 위해)
     batch_size = 1000
