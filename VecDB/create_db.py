@@ -10,6 +10,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 import os
 import warnings
 import chromadb
+from langchain.embeddings import SentenceTransformerEmbeddings
 warnings.filterwarnings('ignore')
 
 
@@ -70,12 +71,12 @@ def create_db(api_key,base_db_dir='./db'):
         docs.append(doc)
     print('Document 객체 리스트 생성 완료')
     # model_name = 'intfloat/multilingual-e5-large-instruct'
-    embeddings = OpenAIEmbeddings(api_key=api_key)
+    embeddings = SentenceTransformerEmbeddings(model_name='nlpai-lab/KURE-v1',kwargs={"device": "cuda"})
     
     print('텍스트 분할 중...')
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=250, ##### 1500
-        chunk_overlap=50 ##### 300
+        chunk_overlap=25 ##### 300
     )
     
     split_docs = text_splitter.split_documents(docs)
@@ -84,9 +85,9 @@ def create_db(api_key,base_db_dir='./db'):
      # 자식 청크를 저장할 벡터스토어 생성
     print('벡터스토어 생성 중...')
     total_docs = len(split_docs)
-    print(f'총 {len(split_docs)}개의 문서를 {total_docs}개의 청크로 처리합니다...')
+    print(f'총 {len(docs)}개의 문서를 {total_docs}개의 청크로 처리합니다...')
     
-    # 배치 크기 설정 (메모리 관리를 위해)
+    # 배치 크기 설정
     batch_size = 1000
     processed = 0
     
@@ -102,6 +103,7 @@ def create_db(api_key,base_db_dir='./db'):
                 collection_name='LAW_RAG',
                 persist_directory=base_db_dir
             )
+            return
         else:
             # 나머지 배치는 추가
             vectorstore.add_documents(batch_docs)
@@ -120,7 +122,7 @@ def retrieve_db(query,host,port,username,password,db_name,api_key,base_db_dir='.
     print('벡터스토어 생성 중...')
     vectorstore = Chroma(
         persist_directory=base_db_dir,
-        embedding_function=OpenAIEmbeddings(api_key=api_key),
+        embedding_function=SentenceTransformerEmbeddings(model_name='nlpai-lab/KURE-v1',kwargs={"device": "cuda"}),
         collection_name='LAW_RAG'
     )
     print('벡터스토어 생성 완료')
