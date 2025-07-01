@@ -44,13 +44,13 @@ def save_df(host,port,username,password,db_name):
 
 def create_db(api_key,base_db_dir='./db'):
     # 판례.csv 파일 읽기
-    df_판례 = pd.read_csv('판례.csv')
+    df_판례 = pd.read_csv('판례.csv', nrows=1000)
 
     
     # 기존 벡터 DB가 존재하면 삭제
     try:
         client = chromadb.PersistentClient(path=base_db_dir)
-        client.delete_collection(name='LAW_RAG')
+        client.delete_collection(name='LAW_RAG_TEST_250_25_openai/sentence_transformer')
         print(f"[삭제] 기존 벡터 DB가 삭제되었습니다: {base_db_dir}")
     except Exception as e:
         print(f"[경고] 기존 DB 삭제 중 오류 발생: {e}")
@@ -84,7 +84,7 @@ def create_db(api_key,base_db_dir='./db'):
      # 자식 청크를 저장할 벡터스토어 생성
     print('벡터스토어 생성 중...')
     total_docs = len(split_docs)
-    print(f'총 {len(split_docs)}개의 문서를 {total_docs}개의 청크로 처리합니다...')
+    print(f'총 {total_docs}개의 문서를 처리합니다...')
     
     # 배치 크기 설정 (메모리 관리를 위해)
     batch_size = 1000
@@ -99,7 +99,7 @@ def create_db(api_key,base_db_dir='./db'):
             vectorstore = Chroma.from_documents(
                 documents=batch_docs,
                 embedding=embeddings,
-                collection_name='LAW_RAG',
+                collection_name='LAW_RAG_TEST_250_25_openai/sentence_transformer',
                 persist_directory=base_db_dir
             )
         else:
@@ -139,3 +139,5 @@ def retrieve_db(query,host,port,username,password,db_name,api_key,base_db_dir='.
         result = get_document(conn,meta['source'])
         print('▶ 전체 판례:',result['판례내용'])
         print("\n" + "="*50)
+
+    return results
