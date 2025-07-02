@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-dotenv
+pandas
+pymysql
+langchain
+chromadb
+langchain-community
+langchain-huggingface
+langchain-openai
+sentence-transformers

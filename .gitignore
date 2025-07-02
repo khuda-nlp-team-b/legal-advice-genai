@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+
+# Environment variables
+.env
+
+# SQLite DB, Chroma DB, local test dbs
+*.sqlite3
+db/
+
+# Node / React
+node_modules/
+build/
+dist/
+
+# Logs
+*.log
+
+# Editor folders
+.vscode/
+.idea/
+
+# OS system files
+.DS_Store
+Thumbs.db
