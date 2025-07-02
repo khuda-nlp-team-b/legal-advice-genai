@@ -249,7 +249,10 @@ def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1
         collection_name='LAW_RAG_250_50'
     )
     print('벡터스토어 생성 완료')
-    retriever = vectorstore.as_retriever(search_kwargs={"k": k})
+    retriever = vectorstore.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": k, "fetch_k": 10, "lambda_mult": 0.5}
+        )
     print('벡터스토어 검색 중...')
     results = retriever.invoke(query)
     
@@ -262,7 +265,7 @@ def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1
         print(f"▶ 사건명 : {meta['case_type']}")
         print("▶ 유사 문단:", doc.page_content.strip())
         result = get_document(conn,meta['source'])
-        print('▶ 전체 판례:',result['판례내용'])
+        #print('▶ 전체 판례:',result['판례내용'])
         print("\n" + "="*50)
 
 def check_db(base_db_dir='./db'):

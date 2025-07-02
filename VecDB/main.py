@@ -14,4 +14,4 @@ api_key = os.getenv('OPENAI_API_KEY')
 
 #cdb.save_df(host,port,username,password,db)
 #cdb.create_db()
-cdb.retrieve_db('나는 친구에게 500만 원을 빌려줬는데, 약속한 기한이 지나도 갚지 않고 연락을 피하고 있다. 여러 차례 연락했지만 계속 무시당하고 있다. 법적으로 대응해야 할지 고민 중이다.',host,port,username,password,db,k=3)
+cdb.retrieve_db('상점을 운영하는데, 갑작스럽게 임대료를 인상하겠다는 건물주의 통보를 받았다. 계약서에는 임대료 인상에 대한 내용이 명확히 명시되어 있지 않은 상황이다.',host,port,username,password,db,k=3)
