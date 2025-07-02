@@ -3,5 +3,7 @@ node_modules
 dist
 .env
 .vscode
-판례.csv
 db/
+VecDB/db/
+VecDB/판례.csv
+__pycache__/

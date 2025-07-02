@@ -42,7 +42,7 @@ def create_test_db(api_key, base_db_dir='./db_test'):
         docs.append(doc)
     print('테스트용 Document 객체 리스트 생성 완료')
     openai_embeddings = OpenAIEmbeddings(api_key=api_key,model='text-embedding-3-small')
-    sentence_transformer_embeddings = SentenceTransformerEmbeddings(model_name='nlpai-lab/KURE-v1')
+    sentence_transformer_embeddings = SentenceTransformerEmbeddings(model_name='nlpai-lab/KURE-v1',model_kwargs={'device':'cuda'})
     # 여러 chunk_size, chunk_overlap 조합에 대해 두 임베딩 모델로 벡터스토어 생성
     chunk_configs = [
         (250, 25),
