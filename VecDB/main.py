@@ -13,5 +13,5 @@ db = os.getenv('DB_NAME')
 api_key = os.getenv('OPENAI_API_KEY')
 
 #cdb.save_df(host,port,username,password,db)
-cdb.create_db()
-#cdb.retrieve_db('누가 내 돈을 가지고 다른 곳에 투자하여서 모두 소진했어.',host,port,username,password,db,api_key)
+#cdb.create_db()
+cdb.retrieve_db('상점을 운영하는데, 갑작스럽게 임대료를 인상하겠다는 건물주의 통보를 받았다. 계약서에는 임대료 인상에 대한 내용이 명확히 명시되어 있지 않은 상황이다.',host,port,username,password,db,k=10)

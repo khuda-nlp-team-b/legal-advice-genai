@@ -8,12 +8,9 @@ import os
 import warnings
 import chromadb
 from langchain.embeddings import SentenceTransformerEmbeddings
-<<<<<<< HEAD
-=======
 import torch
 import time
 from datetime import datetime, timedelta
->>>>>>> c999bd342716fb314c0a6ed0f194555535ac501e
 warnings.filterwarnings('ignore')
 
 
@@ -46,7 +43,7 @@ def save_df(host,port,username,password,db_name):
     conn.close()
     
 
-def create_db(base_db_dir='./db'):
+def create_db(base_db_dir='C:\\db'):
     # CUDA 사용 가능 여부 확인
     cuda_available = torch.cuda.is_available()
     if cuda_available:
@@ -101,15 +98,16 @@ def create_db(base_db_dir='./db'):
         doc = Document(page_content=str(row['판례내용']), metadata=metadata)
         docs.append(doc)
     print('Document 객체 리스트 생성 완료')
-<<<<<<< HEAD
     # model_name = 'intfloat/multilingual-e5-large-instruct'
-    embeddings = SentenceTransformerEmbeddings(model_name='nlpai-lab/KURE-v1',kwargs={"device": "cuda"})
+    embeddings = SentenceTransformerEmbeddings(model_name='nlpai-lab/KURE-v1', model_kwargs={"device": "cpu"})
     
     print('텍스트 분할 중...')
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=250, ##### 1500
         chunk_overlap=25 ##### 300
-=======
+    )
+    split_docs = text_splitter.split_documents(docs)
+    print(f'텍스트 분할 완료: {len(docs)}개 문서 → {len(split_docs)}개 청크')
     
     # 임베딩 모델 설정 (CUDA 사용 여부에 따라)
     device = "cuda" if cuda_available else "cpu"
@@ -124,18 +122,10 @@ def create_db(base_db_dir='./db'):
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=250,
         chunk_overlap=50
->>>>>>> c999bd342716fb314c0a6ed0f194555535ac501e
     )
     
     split_docs = text_splitter.split_documents(docs)
     print(f'텍스트 분할 완료: {len(docs)}개 문서 → {len(split_docs)}개 청크')
-    
-    # 예상 완료시간 계산
-    estimated_time_per_chunk = 0.1 if cuda_available else 0.5  # 초 단위 (GPU/CPU에 따라 다름)
-    total_estimated_time = len(split_docs) * estimated_time_per_chunk
-    estimated_completion = datetime.now() + timedelta(seconds=total_estimated_time)
-    
-    print(f"⏱️  예상 완료시간: {estimated_completion.strftime('%H:%M:%S')} (약 {total_estimated_time/60:.1f}분)")
     
     # 자식 청크를 저장할 벡터스토어 생성
     print('벡터스토어 생성 중...')
@@ -145,6 +135,7 @@ def create_db(base_db_dir='./db'):
     # 배치 크기 설정 (메모리 관리를 위해)
     batch_size = 1000
     processed = 0
+    processing_times = []  # 각 배치의 처리 시간을 저장할 리스트
     
     for i in range(0, total_docs, batch_size):
         batch_start_time = time.time()
@@ -165,11 +156,23 @@ def create_db(base_db_dir='./db'):
         
         # 배치 처리 시간 계산
         batch_time = time.time() - batch_start_time
-        remaining_chunks = total_docs - processed
-        estimated_remaining_time = remaining_chunks * (batch_time / len(batch_docs))
-        estimated_completion = datetime.now() + timedelta(seconds=estimated_remaining_time)
+        processing_times.append(batch_time)
         
-        print(f'진행률: {processed}/{total_docs} ({processed/total_docs*100:.1f}%) - 예상 완료: {estimated_completion.strftime("%H:%M:%S")}')
+        # 이전 배치들의 평균 처리 시간으로 예상 완료시간 계산
+        if len(processing_times) > 1:
+            avg_time_per_batch = sum(processing_times) / len(processing_times)
+            remaining_batches = (total_docs - processed) // batch_size + (1 if (total_docs - processed) % batch_size > 0 else 0)
+            estimated_remaining_time = remaining_batches * avg_time_per_batch
+            estimated_completion = datetime.now() + timedelta(seconds=estimated_remaining_time)
+            
+            print(f'진행률: {processed}/{total_docs} ({processed/total_docs*100:.1f}%) - 예상 완료: {estimated_completion.strftime("%H:%M:%S")} (평균 배치시간: {avg_time_per_batch:.1f}초)')
+        else:
+            # 첫 번째 배치 후에는 아직 평균을 계산할 수 없으므로 현재 배치 시간으로 추정
+            remaining_batches = (total_docs - processed) // batch_size + (1 if (total_docs - processed) % batch_size > 0 else 0)
+            estimated_remaining_time = remaining_batches * batch_time
+            estimated_completion = datetime.now() + timedelta(seconds=estimated_remaining_time)
+            
+            print(f'진행률: {processed}/{total_docs} ({processed/total_docs*100:.1f}%) - 예상 완료: {estimated_completion.strftime("%H:%M:%S")} (현재 배치시간: {batch_time:.1f}초)')
     
     vectorstore.persist()
     chunk_time = time.time() - chunk_start_time
@@ -188,12 +191,6 @@ def create_db(base_db_dir='./db'):
     split_docs = text_splitter.split_documents(docs)
     print(f'텍스트 분할 완료: {len(docs)}개 문서 → {len(split_docs)}개 청크')
     
-    # 예상 완료시간 계산
-    total_estimated_time = len(split_docs) * estimated_time_per_chunk
-    estimated_completion = datetime.now() + timedelta(seconds=total_estimated_time)
-    
-    print(f"⏱️  예상 완료시간: {estimated_completion.strftime('%H:%M:%S')} (약 {total_estimated_time/60:.1f}분)")
-    
     # 자식 청크를 저장할 벡터스토어 생성
     print('벡터스토어 생성 중...')
     total_docs = len(split_docs)
@@ -202,6 +199,7 @@ def create_db(base_db_dir='./db'):
     # 배치 크기 설정
     batch_size = 1000
     processed = 0
+    processing_times = []  # 각 배치의 처리 시간을 저장할 리스트
     
     for i in range(0, total_docs, batch_size):
         batch_start_time = time.time()
@@ -223,11 +221,23 @@ def create_db(base_db_dir='./db'):
         
         # 배치 처리 시간 계산
         batch_time = time.time() - batch_start_time
-        remaining_chunks = total_docs - processed
-        estimated_remaining_time = remaining_chunks * (batch_time / len(batch_docs))
-        estimated_completion = datetime.now() + timedelta(seconds=estimated_remaining_time)
+        processing_times.append(batch_time)
         
-        print(f'진행률: {processed}/{total_docs} ({processed/total_docs*100:.1f}%) - 예상 완료: {estimated_completion.strftime("%H:%M:%S")}')
+        # 이전 배치들의 평균 처리 시간으로 예상 완료시간 계산
+        if len(processing_times) > 1:
+            avg_time_per_batch = sum(processing_times) / len(processing_times)
+            remaining_batches = (total_docs - processed) // batch_size + (1 if (total_docs - processed) % batch_size > 0 else 0)
+            estimated_remaining_time = remaining_batches * avg_time_per_batch
+            estimated_completion = datetime.now() + timedelta(seconds=estimated_remaining_time)
+            
+            print(f'진행률: {processed}/{total_docs} ({processed/total_docs*100:.1f}%) - 예상 완료: {estimated_completion.strftime("%H:%M:%S")} (평균 배치시간: {avg_time_per_batch:.1f}초)')
+        else:
+            # 첫 번째 배치 후에는 아직 평균을 계산할 수 없으므로 현재 배치 시간으로 추정
+            remaining_batches = (total_docs - processed) // batch_size + (1 if (total_docs - processed) % batch_size > 0 else 0)
+            estimated_remaining_time = remaining_batches * batch_time
+            estimated_completion = datetime.now() + timedelta(seconds=estimated_remaining_time)
+            
+            print(f'진행률: {processed}/{total_docs} ({processed/total_docs*100:.1f}%) - 예상 완료: {estimated_completion.strftime("%H:%M:%S")} (현재 배치시간: {batch_time:.1f}초)')
     
     vectorstore.persist()
     chunk_time = time.time() - chunk_start_time
@@ -242,16 +252,30 @@ def create_db(base_db_dir='./db'):
 
 
     
-def retrieve_db(query,host,port,username,password,db_name,api_key,base_db_dir='./db'):
+def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1):
     print('벡터스토어 생성 중...')
+    
+    cuda_available = torch.cuda.is_available()
+    if cuda_available:
+        print(f"✅ CUDA 사용 가능: {torch.cuda.get_device_name(0)}")
+        print(f"   GPU 메모리: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
+    else:
+        print("❌ CUDA 사용 불가능 - CPU 모드로 실행됩니다")
+    device = "cuda" if cuda_available else "cpu"
+    
     vectorstore = Chroma(
         persist_directory=base_db_dir,
-        embedding_function=SentenceTransformerEmbeddings(model_name='nlpai-lab/KURE-v1',kwargs={"device": "cuda"}),
-        collection_name='LAW_RAG'
+        embedding_function=SentenceTransformerEmbeddings(model_name='nlpai-lab/KURE-v1', model_kwargs={"device": device}),
+        collection_name='LAW_RAG_500_75'
     )
     print('벡터스토어 생성 완료')
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 1})
+    
+    retriever = vectorstore.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": k, "fetch_k": 20, "lambda_mult": 0.5}
+        )
     print('벡터스토어 검색 중...')
+    
     results = retriever.invoke(query)
     
     conn = get_mysql_connection(host,port,username,password,db_name)
@@ -263,5 +287,34 @@ def retrieve_db(query,host,port,username,password,db_name,api_key,base_db_dir='.
         print(f"▶ 사건명 : {meta['case_type']}")
         print("▶ 유사 문단:", doc.page_content.strip())
         result = get_document(conn,meta['source'])
-        print('▶ 전체 판례:',result['판례내용'])
+        #print('▶ 전체 판례:',result['판례내용'])
         print("\n" + "="*50)
+
+def check_db(base_db_dir='./db'):
+    print(f'🔍 DB 경로: {base_db_dir}')
+    try:
+        client = chromadb.PersistentClient(path=base_db_dir)
+        collections = client.list_collections()
+        if not collections:
+            print('❌ 컬렉션이 존재하지 않습니다.')
+            return
+        print(f'✅ {len(collections)}개의 컬렉션이 존재합니다:')
+        for col in collections:
+            print(f'\n📁 컬렉션 이름: {col.name}')
+            print(f'  - id: {col.id}')
+            print(f'  - 메타데이터: {col.metadata}')
+            print(f'  - document count: {col.count()}')
+    except Exception as e:
+        print(f'❌ DB 확인 중 오류 발생: {e}')
+    
+def delete_collection(collection_name, base_db_dir='./db'):
+    print(f'🗑️ 컬렉션 삭제 시도: {collection_name} (DB 경로: {base_db_dir})')
+    try:
+        client = chromadb.PersistentClient(path=base_db_dir)
+        client.delete_collection(name=collection_name)
+        print(f'✅ 컬렉션 "{collection_name}" 삭제 완료!')
+    except Exception as e:
+        print(f'❌ 컬렉션 삭제 중 오류 발생: {e}')
+
+if __name__ == "__main__":
+    check_db()
