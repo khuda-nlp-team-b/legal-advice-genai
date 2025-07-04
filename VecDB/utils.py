@@ -11,6 +11,13 @@ from langchain.embeddings import SentenceTransformerEmbeddings
 import torch
 import time
 from datetime import datetime, timedelta
+from langchain.retrievers.multi_query import MultiQueryRetriever
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import CrossEncoderReranker
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+
 warnings.filterwarnings('ignore')
 
 
@@ -250,6 +257,86 @@ def create_db(base_db_dir='C:\\db'):
     print(f"📁 저장 위치: {base_db_dir}")
     print(f"[완료] 판례 {len(docs)}건이 원본과 청크로 분리되어 저장되었습니다.")
 
+def multiquery_retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1):
+    cuda_available = torch.cuda.is_available()
+    if cuda_available:
+        print(f"✅ CUDA 사용 가능: {torch.cuda.get_device_name(0)}")
+        print(f"   GPU 메모리: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
+    else:
+        print("❌ CUDA 사용 불가능 - CPU 모드로 실행됩니다")
+    device = "cuda" if cuda_available else "cpu"
+    
+    vectorstore = Chroma(
+        persist_directory=base_db_dir,
+        embedding_function=SentenceTransformerEmbeddings(model_name='nlpai-lab/KURE-v1', model_kwargs={"device": device}),
+        collection_name='LAW_RAG_500_75'
+    )
+    retriever = vectorstore.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": k, "fetch_k": 20, "lambda_mult": 0.5}
+    )
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=1)
+    prompt = PromptTemplate.from_template(
+        """
+        By generating multiple perspectives on the user question, your goal is to help the user overcome some of the limitations of distance-based similarity search.  
+Your response must be a list of values separated solely by new-line characters, e.g.  
+foo\nbar\nbaz\n
+
+#ORIGINAL QUESTION:  
+{question}
+
+#Answer in Korean:
+### Role
+You are a “Legal-document RAG” multi-query generator.  
+Based on the single incident scenario provided below, create **5** search queries that will surface a broad range of relevant case-law materials.
+
+### Input format  
+[Incident scenario]
+
+### Output rules  
+1. Output **one query per line**, max 120 characters (including spaces).  
+2. Provide only the raw query strings—no numbering, quotes, comments, or explanations.  
+3. Avoid duplicate or near-duplicate queries; use distinct wording and perspectives.  
+4. Separate lines with `\n` only, following the pattern `foo\nbar\nbaz\n`.
+
+### Query-writing guidelines  
+- Restate the **key facts/acts** and **main legal issues** (tort, vicarious liability, bailment/custody, insurer subrogation, etc.) in varied ways.  
+- Mix **legal terms vs. everyday language**, **Korean vs. English**, **abbreviations vs. full names**—but the final queries should default to Korean.  
+- Where helpful, add **relevant code/article numbers** (e.g., Civil Act Arts. 390 / 750 / 756, Motor-Vehicle Compensation Act) or **notable case numbers**.  
+- Vary event type, location, and parties (valet parking, mall garage, apartment manager, operator, insurer, etc.) to broaden keyword coverage.  
+
+        """
+    )
+    multiquery_retriever = MultiQueryRetriever.from_llm(
+        retriever=retriever,
+        llm=llm,
+        prompt = prompt,
+        include_original=True,
+    )
+    results = multiquery_retriever.invoke(query)
+    conn = get_mysql_connection(host,port,username,password,db_name)
+    # 결과 출력
+    output_lines = []
+    for i, doc in enumerate(results):
+        meta = doc.metadata
+        output_lines.append(f"\n🔍 [결과 {i+1}]")
+        #output_lines.append(f"▶ 판례일련번호 : {meta['source']}")
+        #output_lines.append(f"▶ 사건명 : {meta['case_type']}")
+        output_lines.append("▶ 유사 문단: " + doc.page_content.strip())
+        result = get_document(conn, meta['source'])
+        # 판례내용이 있는지 확인
+        판례내용 = None
+        if result is not None and isinstance(result, dict) and '판례내용' in result:
+            판례내용 = result['판례내용']
+        if 판례내용 is not None:
+            output_lines.append('▶ 전체 판례: ' + str(판례내용))
+        else:
+            output_lines.append('▶ 전체 판례: (정보 없음)')
+        output_lines.append("\n" + "="*50)
+    # 결과를 텍스트 파일로 저장
+    with open("multiquery_retrieve_results.txt", "w", encoding="utf-8") as f:
+        for line in output_lines:
+            f.write(line + "\n")
 
     
 def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1):
@@ -270,25 +357,43 @@ def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1
     )
     print('벡터스토어 생성 완료')
     
-    retriever = vectorstore.as_retriever(
-        search_type="mmr",
-        search_kwargs={"k": k, "fetch_k": 20, "lambda_mult": 0.5}
-        )
-    print('벡터스토어 검색 중...')
+    retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": k, "fetch_k": 20, "lambda_mult": 0.5})
     
+    '''cross_encoder = HuggingFaceCrossEncoder(model_name="BAAI/bge-reranker-v2-m3")
+    compressor = CrossEncoderReranker(model=cross_encoder,top_n=k)
+    compression_retriever = ContextualCompressionRetriever(
+        base_compressor=compressor,
+        base_retriever=retriever
+    )
+    
+    results = compression_retriever.invoke(query)'''
     results = retriever.invoke(query)
     
+    print('벡터스토어 검색 중...')
+
     conn = get_mysql_connection(host,port,username,password,db_name)
     # 결과 출력
+    output_lines = []
     for i, doc in enumerate(results):
         meta = doc.metadata
-        print(f"\n🔍 [결과 {i+1}]")
-        print(f"▶ 판례일련번호 : {meta['source']}")
-        print(f"▶ 사건명 : {meta['case_type']}")
-        print("▶ 유사 문단:", doc.page_content.strip())
-        result = get_document(conn,meta['source'])
-        #print('▶ 전체 판례:',result['판례내용'])
-        print("\n" + "="*50)
+        output_lines.append(f"\n🔍 [결과 {i+1}]")
+        #output_lines.append(f"▶ 판례일련번호 : {meta['source']}")
+        #output_lines.append(f"▶ 사건명 : {meta['case_type']}")
+        output_lines.append("▶ 유사 문단: " + doc.page_content.strip())
+        result = get_document(conn, meta['source'])
+        # 판례내용이 있는지 확인
+        판례내용 = None
+        if result is not None and isinstance(result, dict) and '판례내용' in result:
+            판례내용 = result['판례내용']
+        if 판례내용 is not None:
+            output_lines.append('▶ 전체 판례: ' + str(판례내용))
+        else:
+            output_lines.append('▶ 전체 판례: (정보 없음)')
+        output_lines.append("\n" + "="*50)
+    # 결과를 텍스트 파일로 저장
+    with open("retrieve_results.txt", "w", encoding="utf-8") as f:
+        for line in output_lines:
+            f.write(line + "\n")
 
 def check_db(base_db_dir='./db'):
     print(f'🔍 DB 경로: {base_db_dir}')
