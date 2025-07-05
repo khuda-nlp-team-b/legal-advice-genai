@@ -9,6 +9,8 @@ from langchain_community.llms import HuggingFacePipeline
 from dotenv import load_dotenv
 import sys
 from utils import util as u
+import torch
+from langchain_community.embeddings import SentenceTransformerEmbeddings
 
 
 load_dotenv()
@@ -44,7 +46,7 @@ env = jinja2.Environment(
 answer_tpl = env.get_template("answer_synth.j2")
 
 def get_llm():
-    return ChatOpenAI(api_key=OPENAI_KEY, model="gpt-4o-mini", temperature=0.5)
+    return ChatOpenAI(api_key=OPENAI_KEY, model="gpt-4o-mini", temperature=1)
 
 def rewrite_query(user_query: str) -> str:
     prompt = query_tpl.render(user_query=user_query)
@@ -55,16 +57,16 @@ def rewrite_query(user_query: str) -> str:
     print(f"✔ ({time.perf_counter()-start:.1f}s)")
     return resp.content.strip() if hasattr(resp, "content") else resp.strip()
 
-def run_rag(user_query: str, k: int = 5) -> str:
+def run_rag(user_query: str, vectorstore, k: int = 5) -> str:
     # 1) 검색어 재작성
     #search_query = rewrite_query(user_query)
     #print("   ↪ 검색어:", search_query)
 
     # 2) MySQL+Chroma 통합 전문 조회 (create_db.retrieve_db 호출)
-    print("🔍 MySQL 전문 조회 중…")
+    print("DB 검색 중...")
     results = u.retrieve_db(
         user_query,
-        HOST, PORT, USER, PASSWORD, DB_NAME,k=k
+        HOST, PORT, USER, PASSWORD, DB_NAME,vectorstore,k=k
     )
 
     # 3) 검색 결과 처리 및 템플릿 적용
@@ -103,13 +105,33 @@ def run_rag(user_query: str, k: int = 5) -> str:
     
     return resp.content.strip() if hasattr(resp, "content") else resp.strip()
 
+def setup_db(base_db_dir='./db'):
+    cuda_available = torch.cuda.is_available()
+    if cuda_available:
+        print(f"✅ CUDA 사용 가능: {torch.cuda.get_device_name(0)}")
+        print(f"   GPU 메모리: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
+    else:
+        print("❌ CUDA 사용 불가능 - CPU 모드로 실행됩니다")
+    device = "cuda" if cuda_available else "cpu"
+    
+    vectorstore = Chroma(
+        persist_directory=base_db_dir,
+        embedding_function=SentenceTransformerEmbeddings(model_name='nlpai-lab/KURE-v1', model_kwargs={"device": device}),
+        collection_name='LAW_RAG_500_75'
+    )
+    print('벡터스토어 로드 완료')
+    return vectorstore
 
 def main():
-    user_query = input("💬 질문을 입력하세요: ").strip()
-
-    answer = run_rag(user_query)
-    print(user_query)
-    print("📌 최종 요약\n", answer)
+    vectorstore = setup_db()
+    while True:
+        user_query = input("💬 처한 법적 상황과 걱정하는 점을 알려주세요: ").strip()
+        if user_query == 'exit':
+            break
+        answer = run_rag(user_query,vectorstore)
+        print(user_query)
+        print("📌 최종 요약\n", answer)
+        
     
     return answer
 

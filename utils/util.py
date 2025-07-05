@@ -328,23 +328,7 @@ Based on the single incident scenario provided below, create **5** search querie
     return output
 
     
-def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1):
-    print('벡터스토어 생성 중...')
-    
-    cuda_available = torch.cuda.is_available()
-    if cuda_available:
-        print(f"✅ CUDA 사용 가능: {torch.cuda.get_device_name(0)}")
-        print(f"   GPU 메모리: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
-    else:
-        print("❌ CUDA 사용 불가능 - CPU 모드로 실행됩니다")
-    device = "cuda" if cuda_available else "cpu"
-    
-    vectorstore = Chroma(
-        persist_directory=base_db_dir,
-        embedding_function=SentenceTransformerEmbeddings(model_name='nlpai-lab/KURE-v1', model_kwargs={"device": device}),
-        collection_name='LAW_RAG_500_75'
-    )
-    print('벡터스토어 생성 완료')
+def retrieve_db(query,host,port,username,password,db_name,vectorstore,k=1):
     
     retriever = vectorstore.as_retriever(
         search_type="mmr", 
@@ -364,7 +348,8 @@ def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1
     
     print('벡터스토어 검색 중...')
 
-    conn = get_mysql_connection(host,port,username,password,db_name)
+    if not conn:
+        conn = get_mysql_connection(host,port,username,password,db_name)
     # 결과 출력
     output = []
     for i, doc in enumerate(results):
@@ -377,8 +362,11 @@ def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1
         "유사문단": doc.page_content.strip(),
         "전문": result['판례내용'] if result else None
         })
+        #print(meta['source'])
         #print(doc.page_content)
+    conn.close()
     return output
+
 
 def check_db(base_db_dir='./db'):
     print(f'🔍 DB 경로: {base_db_dir}')
