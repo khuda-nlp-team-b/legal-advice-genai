@@ -3,3 +3,8 @@ node_modules
 dist
 .env
 .vscode
+db/
+VecDB/db/
+VecDB/판례.csv
+__pycache__/
+db.zip
