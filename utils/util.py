@@ -346,7 +346,11 @@ def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1
     )
     print('벡터스토어 생성 완료')
     
-    retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": k, "fetch_k": 20, "lambda_mult": 0.5})
+    retriever = vectorstore.as_retriever(
+        search_type="mmr", 
+        search_kwargs={"k": k, "fetch_k": 20, "lambda_mult": 0.5},
+        return_metadata=True
+    )
     
     '''cross_encoder = HuggingFaceCrossEncoder(model_name="BAAI/bge-reranker-v2-m3")
     compressor = CrossEncoderReranker(model=cross_encoder,top_n=k)
@@ -372,7 +376,8 @@ def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1
         "사건명": meta.get('case_type'),
         "유사문단": doc.page_content.strip(),
         "전문": result['판례내용'] if result else None
-    })
+        })
+        #print(doc.page_content)
     return output
 
 def check_db(base_db_dir='./db'):

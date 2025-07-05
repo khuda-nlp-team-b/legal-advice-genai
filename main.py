@@ -2,12 +2,15 @@ import os
 import argparse
 import jinja2
 import time
-import utils as u                             # ← 추가
 from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
 from langchain_community.llms import HuggingFacePipeline
 from dotenv import load_dotenv
+import sys
+from utils import util as u
+
+
 load_dotenv()
 
 # ────────────────── 1) 경로·환경 ──────────────────
@@ -52,7 +55,7 @@ def rewrite_query(user_query: str) -> str:
     print(f"✔ ({time.perf_counter()-start:.1f}s)")
     return resp.content.strip() if hasattr(resp, "content") else resp.strip()
 
-def run_rag(user_query: str, k: int = 10) -> str:
+def run_rag(user_query: str, k: int = 5) -> str:
     # 1) 검색어 재작성
     #search_query = rewrite_query(user_query)
     #print("   ↪ 검색어:", search_query)
@@ -68,26 +71,45 @@ def run_rag(user_query: str, k: int = 10) -> str:
     if not results or len(results) == 0:
         return "유사 판례를 찾지 못했습니다."
 
-    # 가장 유사한 판례 1건만 활용 (확장 가능)
-    top = results[0]
-    context = f"{top['유사문단']} [ref:{top['판례일련번호']}]"
-    full_document = top['전문']
+    # 상위 k개 결과 모두 병합
+    contexts = []
+    full_documents = []
+
+    for i, item in enumerate(results):
+        # 각 결과에서 필요한 정보 추출
+        contexts.append(f"{i+1}. {item['유사문단']} [판례번호:{item['판례일련번호']}]")
+        full_documents.append(f"--- 문서 {i+1} ---\n{item['전문']}")
 
     answer = answer_tpl.render(
-        context=context,
-        full_document=full_document,
+        context1=results[0]['유사문단'] + f" [판례번호:{results[0]['판례일련번호']}]",
+        full1=results[0]['전문'],
+        context2=results[1]['유사문단'] + f" [판례번호:{results[1]['판례일련번호']}]",
+        full2=results[1]['전문'],
+        context3=results[2]['유사문단'] + f" [판례번호:{results[2]['판례일련번호']}]",
+        full3=results[2]['전문'],
+        context4=results[3]['유사문단'] + f" [판례번호:{results[3]['판례일련번호']}]",
+        full4=results[3]['전문'],
+        context5=results[4]['유사문단'] + f" [판례번호:{results[4]['판례일련번호']}]",
+        full5=results[4]['전문'],
         user_query=user_query
     )
-    return answer
+
+    
+    llm = get_llm()
+    print("🔄 답변 생성(LLM) …", end=" ")
+    start = time.perf_counter()
+    resp = llm.invoke(answer)
+    print(f"✔ ({time.perf_counter()-start:.1f}s)")
+    
+    return resp.content.strip() if hasattr(resp, "content") else resp.strip()
 
 
 def main():
-
     user_query = input("💬 질문을 입력하세요: ").strip()
 
     answer = run_rag(user_query)
-    
-    print("\n📌 최종 요약\n", answer)
+    print(user_query)
+    print("📌 최종 요약\n", answer)
     
     return answer
 

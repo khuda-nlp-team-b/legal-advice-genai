@@ -1,7 +1,7 @@
 # main.py
 import os
 from dotenv import load_dotenv
-import utils as u
+import util as u
 
 load_dotenv()
 
@@ -14,4 +14,4 @@ api_key = os.getenv('OPENAI_API_KEY')
 
 #cdb.save_df(host,port,username,password,db)
 #cdb.create_db()
-u.retrieve_db('차를 주차장에 주차해놓고 왔는데, 돌아와보니 차량이 훼손되어 있었다. CCTV를 확인해보니 주차장 관리자가 차량을 이동하다가 발생한 사고였다.',host,port,username,password,db,k=3)
+u.retrieve_db('택시를 타고 가다가, 운전자가 신호를 위반하며 다른 차량과 충돌하는 사고가 발생했다. 택시 회사는 사고에 대한 책임을 인정하지 않고 있다.',host,port,username,password,db,k=3)
