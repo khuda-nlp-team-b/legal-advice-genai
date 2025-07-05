@@ -301,9 +301,7 @@ Based on the single incident scenario provided below, create **5** search querie
 
 ### Query-writing guidelines  
 - Restate the **key facts/acts** and **main legal issues** (tort, vicarious liability, bailment/custody, insurer subrogation, etc.) in varied ways.  
-- Mix **legal terms vs. everyday language**, **Korean vs. English**, **abbreviations vs. full names**—but the final queries should default to Korean.  
-- Where helpful, add **relevant code/article numbers** (e.g., Civil Act Arts. 390 / 750 / 756, Motor-Vehicle Compensation Act) or **notable case numbers**.  
-- Vary event type, location, and parties (valet parking, mall garage, apartment manager, operator, insurer, etc.) to broaden keyword coverage.  
+- Restate the situation in a legal way so that it can be used as a search query.
 
         """
     )
@@ -316,27 +314,18 @@ Based on the single incident scenario provided below, create **5** search querie
     results = multiquery_retriever.invoke(query)
     conn = get_mysql_connection(host,port,username,password,db_name)
     # 결과 출력
-    output_lines = []
+    output = []
     for i, doc in enumerate(results):
         meta = doc.metadata
-        output_lines.append(f"\n🔍 [결과 {i+1}]")
-        #output_lines.append(f"▶ 판례일련번호 : {meta['source']}")
-        #output_lines.append(f"▶ 사건명 : {meta['case_type']}")
-        output_lines.append("▶ 유사 문단: " + doc.page_content.strip())
         result = get_document(conn, meta['source'])
-        # 판례내용이 있는지 확인
-        판례내용 = None
-        if result is not None and isinstance(result, dict) and '판례내용' in result:
-            판례내용 = result['판례내용']
-        if 판례내용 is not None:
-            output_lines.append('▶ 전체 판례: ' + str(판례내용))
-        else:
-            output_lines.append('▶ 전체 판례: (정보 없음)')
-        output_lines.append("\n" + "="*50)
-    # 결과를 텍스트 파일로 저장
-    with open("multiquery_retrieve_results.txt", "w", encoding="utf-8") as f:
-        for line in output_lines:
-            f.write(line + "\n")
+        output.append({
+            "rank": i+1,
+            "판례일련번호": meta['source'],
+            "사건명": meta.get('case_type'),
+            "유사문단": doc.page_content.strip(),
+            "전문": result['판례내용'] if result else None
+        })
+    return output
 
     
 def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1):
@@ -373,27 +362,18 @@ def retrieve_db(query,host,port,username,password,db_name,base_db_dir='./db',k=1
 
     conn = get_mysql_connection(host,port,username,password,db_name)
     # 결과 출력
-    output_lines = []
+    output = []
     for i, doc in enumerate(results):
         meta = doc.metadata
-        output_lines.append(f"\n🔍 [결과 {i+1}]")
-        #output_lines.append(f"▶ 판례일련번호 : {meta['source']}")
-        #output_lines.append(f"▶ 사건명 : {meta['case_type']}")
-        output_lines.append("▶ 유사 문단: " + doc.page_content.strip())
         result = get_document(conn, meta['source'])
-        # 판례내용이 있는지 확인
-        판례내용 = None
-        if result is not None and isinstance(result, dict) and '판례내용' in result:
-            판례내용 = result['판례내용']
-        if 판례내용 is not None:
-            output_lines.append('▶ 전체 판례: ' + str(판례내용))
-        else:
-            output_lines.append('▶ 전체 판례: (정보 없음)')
-        output_lines.append("\n" + "="*50)
-    # 결과를 텍스트 파일로 저장
-    with open("retrieve_results.txt", "w", encoding="utf-8") as f:
-        for line in output_lines:
-            f.write(line + "\n")
+        output.append({
+        "rank": i+1,
+        "판례일련번호": meta['source'],
+        "사건명": meta.get('case_type'),
+        "유사문단": doc.page_content.strip(),
+        "전문": result['판례내용'] if result else None
+    })
+    return output
 
 def check_db(base_db_dir='./db'):
     print(f'🔍 DB 경로: {base_db_dir}')
