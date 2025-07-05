@@ -57,47 +57,31 @@ def run_rag(user_query: str, k: int = 10) -> str:
     search_query = rewrite_query(user_query)
     print("   ↪ 검색어:", search_query)
 
-    # 2) MySQL 전문 조회 (create_db.retrieve_db 호출)
+    # 2) MySQL+Chroma 통합 전문 조회 (create_db.retrieve_db 호출)
     print("🔍 MySQL 전문 조회 중…")
-    cdb.retrieve_db(
+    results = cdb.retrieve_db(
         search_query,
         HOST, PORT, USER, PASSWORD, DB_NAME,
         OPENAI_KEY,
         base_db_dir=BASE_DB_DIR
-    )  # :contentReference[oaicite:1]{index=1}
-
-    # 3) 벡터스토어 로드
-    print("📂 벡터 DB 로드 중 …", end=" ")
-    start = time.perf_counter()
-    embeddings = OpenAIEmbeddings(api_key=OPENAI_KEY)
-    vect = Chroma(
-        persist_directory='./db_test',
-        embedding_function=embeddings,
-        collection_name=DB_SUBDIR,
-    )
-    print(f"✔ ({time.perf_counter()-start:.1f}s)")
-
-    # 4) 유사 문단 검색
-    print("🔍 검색 …", end=" ")
-    start = time.perf_counter()
-    docs = vect.as_retriever(search_kwargs={"k": k}).invoke(search_query)
-    print(f"✔ ({time.perf_counter()-start:.1f}s, {len(docs)}개)")
-
-    # 5) 컨텍스트 조립
-    context = "\n\n".join(
-        f"[ref:{d.metadata['source']}] " + d.page_content
-        for d in docs
     )
 
-    # 6) 답변 생성
-    print("🖋️ 답변 생성 …", end=" ")
-    start = time.perf_counter()
-    prompt = answer_tpl.render(context=context, user_query=user_query)
-    llm = get_llm()
-    result = llm.invoke(prompt)
-    print(f"✔ ({time.perf_counter()-start:.1f}s)")
+    # 3) 검색 결과 처리 및 템플릿 적용
+    if not results or len(results) == 0:
+        return "유사 판례를 찾지 못했습니다."
 
-    return result.content if hasattr(result, "content") else result
+    # 가장 유사한 판례 1건만 활용 (확장 가능)
+    top = results[0]
+    context = f"{top['유사문단']} [ref:{top['판례일련번호']}]"
+    full_document = top['전문']
+
+    answer = answer_tpl.render(
+        context=context,
+        full_document=full_document,
+        user_query=user_query
+    )
+    return answer
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -118,6 +102,4 @@ def main():
 
     answer = run_rag(user_query, args.k)
     print("\n📌 최종 요약\n", answer)
-
-if __name__ == "__main__":
-    main()
+    return answer
