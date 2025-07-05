@@ -36,21 +36,23 @@ def get_document(conn,source):
 
 
 def save_df(host,port,username,password,db_name):
+    print("판례 테이블에서 데이터를 읽어오고 있습니다...")
     conn = pymysql.connect(host=host, port=port, user=username, password=password, db=db_name)
     df = pd.read_sql('SELECT * FROM 판례', conn)
+    print(f"총 {len(df)}건의 판례를 읽었습니다.")
     df.to_csv('판례.csv', index=False)
+    print("csv 파일로 저장 완료: 판례.csv")
     conn.close()
-    
 
-def create_db(api_key,base_db_dir='./db'):
+def create_db(api_key,base_db_dir='./db_test'):
     # 판례.csv 파일 읽기
-    df_판례 = pd.read_csv('판례.csv', nrows=1000)
+    df_판례 = pd.read_csv('판례.csv')
 
     
     # 기존 벡터 DB가 존재하면 삭제
     try:
         client = chromadb.PersistentClient(path=base_db_dir)
-        client.delete_collection(name='LAW_RAG_TEST_250_25_openai/sentence_transformer')
+        client.delete_collection(name='LAW_RAG_TEST_1000_100_openai')
         print(f"[삭제] 기존 벡터 DB가 삭제되었습니다: {base_db_dir}")
     except Exception as e:
         print(f"[경고] 기존 DB 삭제 중 오류 발생: {e}")
@@ -81,10 +83,10 @@ def create_db(api_key,base_db_dir='./db'):
     split_docs = text_splitter.split_documents(docs)
     print('텍스트 분할 완료')
     
-     # 자식 청크를 저장할 벡터스토어 생성
+    # 자식 청크를 저장할 벡터스토어 생성
     print('벡터스토어 생성 중...')
     total_docs = len(split_docs)
-    print(f'총 {total_docs}개의 문서를 처리합니다...')
+    print(f'총 {len(split_docs)}개의 문서를 {total_docs}개의 청크로 처리합니다...')
     
     # 배치 크기 설정 (메모리 관리를 위해)
     batch_size = 1000
@@ -99,7 +101,7 @@ def create_db(api_key,base_db_dir='./db'):
             vectorstore = Chroma.from_documents(
                 documents=batch_docs,
                 embedding=embeddings,
-                collection_name='LAW_RAG_TEST_250_25_openai/sentence_transformer',
+                collection_name='LAW_RAG_TEST_100_100_openai',
                 persist_directory=base_db_dir
             )
         else:
@@ -121,23 +123,34 @@ def retrieve_db(query,host,port,username,password,db_name,api_key,base_db_dir='.
     vectorstore = Chroma(
         persist_directory=base_db_dir,
         embedding_function=OpenAIEmbeddings(api_key=api_key),
-        collection_name='LAW_RAG'
+        collection_name='LAW_RAG_TEST_1000_100_openai'
     )
     print('벡터스토어 생성 완료')
     retriever = vectorstore.as_retriever(search_kwargs={"k": 1})
     print('벡터스토어 검색 중...')
     results = retriever.invoke(query)
+    print("retriever.invoke 결과:", results)
     
     conn = get_mysql_connection(host,port,username,password,db_name)
+    output = []
     # 결과 출력
     for i, doc in enumerate(results):
         meta = doc.metadata
+        result = get_document(conn, meta['source'])
+        output.append({
+            "rank": i+1,
+            "판례일련번호": meta['source'],
+            "사건명": meta.get('case_type'),
+            "유사문단": doc.page_content.strip(),
+            "전문": result['판례내용'] if result else None
+        })
         print(f"\n🔍 [결과 {i+1}]")
         print(f"▶ 판례일련번호 : {meta['source']}")
         print(f"▶ 사건명 : {meta['case_type']}")
         print("▶ 유사 문단:", doc.page_content.strip())
+        print("▶ 유사 판례 ID :", doc.metadata["source"])
+        print("▶ 사건명       :", doc.metadata["case_type"])
         result = get_document(conn,meta['source'])
         print('▶ 전체 판례:',result['판례내용'])
         print("\n" + "="*50)
-
-    return results
+    return output
