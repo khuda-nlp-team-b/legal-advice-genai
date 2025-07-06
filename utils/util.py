@@ -19,6 +19,11 @@ from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 import asyncio
 
+# LangChain 텔레메트리 비활성화
+os.environ["LANGCHAIN_TRACING_V2"] = "false"
+os.environ["LANGCHAIN_ENDPOINT"] = ""
+os.environ["LANGCHAIN_API_KEY"] = ""
+
 warnings.filterwarnings('ignore')
 
 

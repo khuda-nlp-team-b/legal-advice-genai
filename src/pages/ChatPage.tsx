@@ -48,26 +48,17 @@ const ChatPage: React.FC = () => {
       };
       setMessages((prev) => [...prev, userMessage]);
       (async () => {
-        // 단계별 로딩 메시지
-        const loadingStages = [
-          "DB 검색 중...",
-          "벡터스토어 검색 중...",
-          "답변 생성 중...",
-        ];
-        for (let i = 0; i < loadingStages.length; i++) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `loading-initial-${i}`,
-              text: loadingStages[i],
-              isUser: false,
-              timestamp: new Date(),
-              isLoading: true,
-            },
-          ]);
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise((res) => setTimeout(res, 700));
-        }
+        // 단일 로딩 메시지
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `loading-initial`,
+            text: "답변 생성 중입니다...",
+            isUser: false,
+            timestamp: new Date(),
+            isLoading: true,
+          },
+        ]);
         try {
           const response = await fetch("http://localhost:8000/api/ask", {
             method: "POST",
@@ -117,25 +108,17 @@ const ChatPage: React.FC = () => {
     };
     setMessages((prev) => [...prev, userMessage]);
     setInputText("");
-    const loadingStages = [
-      "DB 검색 중...",
-      "벡터스토어 검색 중...",
-      "답변 생성 중...",
-    ];
-    for (let i = 0; i < loadingStages.length; i++) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `loading-${i}`,
-          text: loadingStages[i],
-          isUser: false,
-          timestamp: new Date(),
-          isLoading: true,
-        },
-      ]);
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((res) => setTimeout(res, 700));
-    }
+    // 단일 로딩 메시지
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `loading`,
+        text: "답변 생성 중입니다...",
+        isUser: false,
+        timestamp: new Date(),
+        isLoading: true,
+      },
+    ]);
     try {
       const response = await fetch("http://localhost:8000/api/ask", {
         method: "POST",
