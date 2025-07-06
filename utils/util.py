@@ -221,7 +221,6 @@ async def run_rag(user_query: str, vectorstore, k: int = 5, conn = None,answer_t
         user_query=user_query
     )
 
-    
     llm = get_llm(openai_key)
     print("🔄 답변 생성(LLM) …", end=" ")
     start = time.perf_counter()
@@ -235,8 +234,9 @@ async def run_rag(user_query: str, vectorstore, k: int = 5, conn = None,answer_t
             full_response += str(content)
     
     print(f"✔ ({time.perf_counter()-start:.1f}s)")
-    
-    return full_response.strip()
+
+    # ''' '''로 감싸진 답변이면 제거
+    content = full_response.strip()
 
 async def run_rag_stream(user_query: str, vectorstore, k: int = 5, conn = None, answer_tpl = None, openai_key = None):
     """스트리밍 방식으로 답변을 생성하는 함수 - 각 청크를 yield"""
@@ -289,6 +289,9 @@ async def run_rag_stream(user_query: str, vectorstore, k: int = 5, conn = None, 
             #print(content, end="", flush=True)
             yield str(content)
 
+    if content.startswith("'''") and content.endswith("'''"):
+        content = content[3:-3].strip()
+    return content
 
 def setup_db(base_db_dir='./db'):
     cuda_available = torch.cuda.is_available()

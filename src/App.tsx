@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
+import ChatPage from "./pages/ChatPage";
 import QuestionInputPage from "./pages/QuestionInputPage";
 import AnswerResultPage from "./pages/AnswerResultPage";
 import CaseDetailPage from "./pages/CaseDetailPage";
@@ -23,6 +24,8 @@ export default function App() {
           <main className="flex-grow p-6 overflow-y-auto">
             <Routes>
               <Route path="/" element={<QuestionInputPage />} />
+              <Route path="/chat" element={<ChatPage />} />
+              <Route path="/question" element={<QuestionInputPage />} />
               <Route path="/result" element={<AnswerResultPage />} />
               <Route path="/case/:id" element={<CaseDetailPage />} />
               <Route path="/history" element={<HistoryPage />} />
@@ -30,7 +33,9 @@ export default function App() {
             </Routes>
           </main>
         </div>
-        {isSettingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+        {isSettingsOpen && (
+          <SettingsModal onClose={() => setSettingsOpen(false)} />
+        )}
       </div>
     </Router>
   );
