@@ -22,6 +22,9 @@ app.add_middleware(
 class AskRequest(BaseModel):
     question: str
 
+class CaseRequest(BaseModel):
+    caseNumber: str
+
 @app.post("/api/ask")
 async def ask(req: AskRequest):
     conn = pymysql.connect(
@@ -45,6 +48,33 @@ async def ask(req: AskRequest):
         openai_key=os.environ['OPENAI_API_KEY']
     )
     return {"answer": answer}
+
+@app.post("/api/case")
+async def get_case_info(req: CaseRequest):
+    conn = pymysql.connect(
+        host=os.environ['DB_HOST'],
+        port=int(os.environ.get('DB_PORT', 3306)),
+        user=os.environ['DB_USER'],
+        password=os.environ['DB_PASSWORD'],
+        db=os.environ['DB_NAME'],
+        charset='utf8',
+        cursorclass=pymysql.cursors.DictCursor
+    )
+    
+    try:
+        with conn.cursor() as cursor:
+            sql = f'SELECT 판례일련번호, 판례내용 FROM 판례 WHERE 판례일련번호 = {req.caseNumber}'
+            cursor.execute(sql)
+            result = cursor.fetchone()
+            
+            if result:
+                return {"caseInfo": result['판례내용']}
+            else:
+                return {"error": "판례를 찾을 수 없습니다."}, 404
+    except Exception as e:
+        return {"error": f"데이터베이스 오류: {str(e)}"}, 500
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
     import uvicorn

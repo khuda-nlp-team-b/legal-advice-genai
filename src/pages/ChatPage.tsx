@@ -8,6 +8,7 @@ interface Message {
   isUser: boolean;
   timestamp: Date;
   isLoading?: boolean;
+  feedback?: boolean | null;
 }
 
 const ChatPage: React.FC = () => {
@@ -98,6 +99,90 @@ const ChatPage: React.FC = () => {
     // eslint-disable-next-line
   }, [initialQuestion]);
 
+  const handleFeedback = (messageId: string, isPositive: boolean) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, feedback: isPositive } : msg
+      )
+    );
+
+    // 피드백을 서버에 전송 (선택사항)
+    console.log(
+      `피드백: ${isPositive ? "좋아요" : "싫어요"} - 메시지 ID: ${messageId}`
+    );
+
+    // TODO: 실제 서버에 피드백 전송 로직 추가
+    // fetch("/api/feedback", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({ messageId, feedback: isPositive }),
+    // });
+  };
+
+  const handleCaseClick = async (caseNumber: string) => {
+    // 로딩 메시지 추가
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `loading-case-${caseNumber}`,
+        text: "판례 정보를 조회 중입니다...",
+        isUser: false,
+        timestamp: new Date(),
+        isLoading: true,
+      },
+    ]);
+
+    try {
+      const response = await fetch("http://localhost:8000/api/case", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseNumber }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessages((prev) =>
+          prev
+            .filter((msg) => !msg.isLoading)
+            .concat([
+              {
+                id: Date.now().toString(),
+                text: `📋 판례번호: ${caseNumber}\n\n${data.caseInfo}`,
+                isUser: false,
+                timestamp: new Date(),
+              },
+            ])
+        );
+      } else {
+        setMessages((prev) =>
+          prev
+            .filter((msg) => !msg.isLoading)
+            .concat([
+              {
+                id: Date.now().toString(),
+                text: `⚠️ 판례번호 ${caseNumber}의 정보를 찾을 수 없습니다.`,
+                isUser: false,
+                timestamp: new Date(),
+              },
+            ])
+        );
+      }
+    } catch (err) {
+      setMessages((prev) =>
+        prev
+          .filter((msg) => !msg.isLoading)
+          .concat([
+            {
+              id: Date.now().toString(),
+              text: "⚠️ 판례 정보 조회 중 오류가 발생했습니다.",
+              isUser: false,
+              timestamp: new Date(),
+            },
+          ])
+      );
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
     const userMessage = {
@@ -180,6 +265,12 @@ const ChatPage: React.FC = () => {
             isUser={message.isUser}
             timestamp={message.timestamp}
             isLoading={message.isLoading}
+            onFeedback={
+              !message.isUser
+                ? (isPositive) => handleFeedback(message.id, isPositive)
+                : undefined
+            }
+            onCaseClick={!message.isUser ? handleCaseClick : undefined}
           />
         ))}
         <div ref={messagesEndRef} />
