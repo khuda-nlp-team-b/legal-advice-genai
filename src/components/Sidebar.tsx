@@ -3,14 +3,16 @@ import { Link } from "react-router-dom";
 
 export default function Sidebar({
   onSettingsClick,
+  open,
+  setOpen,
 }: {
   onSettingsClick: () => void;
+  open: boolean;
+  setOpen: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(true);
-
   return (
     <div
-      className={`bg-green-50 border-r p-4 transition-all ${
+      className={`bg-green-50 border-r p-4 transition-all fixed left-0 top-0 h-full z-10 ${
         open ? "w-56" : "w-14"
       }`}
     >

@@ -14,12 +14,21 @@ import SettingsModal from "./components/SettingsModal";
 
 export default function App() {
   const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
     <Router>
       <div className="min-h-screen flex bg-white text-gray-900">
-        <Sidebar onSettingsClick={() => setSettingsOpen(true)} />
-        <div className="flex-1 flex flex-col">
+        <Sidebar
+          onSettingsClick={() => setSettingsOpen(true)}
+          open={sidebarOpen}
+          setOpen={setSidebarOpen}
+        />
+        <div
+          className={`flex-1 flex flex-col transition-all ${
+            sidebarOpen ? "ml-56" : "ml-14"
+          }`}
+        >
           <Header />
           <main className="flex-grow p-6 overflow-y-auto">
             <Routes>
