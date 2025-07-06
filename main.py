@@ -1,6 +1,7 @@
 import os
 import argparse
 import jinja2
+import asyncio
 from dotenv import load_dotenv
 from utils import util as u
 
@@ -30,13 +31,18 @@ env = jinja2.Environment(
 
 answer_tpl = env.get_template("answer_synth.j2")
 
-def main():
+async def main():
     vectorstore = u.setup_db()
     conn = u.get_mysql_connection(HOST,PORT,USER,PASSWORD,DB_NAME)
     user_query = input("💬 처한 법적 상황과 걱정하는 점을 알려주세요: ").strip()
-    answer = u.run_rag(user_query,vectorstore,5,conn,answer_tpl,OPENAI_KEY)
-    print(user_query)
-    print("📌 최종 요약\n", answer)
+    
+    print(f"\n질문: {user_query}")
+    
+    # 스트리밍 방식으로 답변 생성 - 청크를 받는 대로 바로 출력
+    async for chunk in u.run_rag_stream(user_query, vectorstore, 5, conn, answer_tpl, OPENAI_KEY):
+        print(chunk, end="", flush=True)
+    
+    print("\n")  # 마지막 줄바꿈
     
     '''while True:
         user_query = input("해당 내용에 대해 추가적으로 궁금한 점이 있으신가요? ").strip()
@@ -49,4 +55,4 @@ def main():
     #return answer
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

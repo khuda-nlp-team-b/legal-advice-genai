@@ -17,6 +17,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+import asyncio
 
 warnings.filterwarnings('ignore')
 
@@ -72,7 +73,7 @@ def multiquery_retrieve_db(query,host,port,username,password,db_name,base_db_dir
 
         #Answer in Korean:
         ### Role
-        You are a “Legal-document RAG” multi-query generator.  
+        You are a "Legal-document RAG" multi-query generator.  
         Based on the single incident scenario provided below, create **5** search queries that will surface a broad range of relevant case-law materials.
 
         ### Input format  
@@ -179,7 +180,7 @@ def delete_collection(collection_name, base_db_dir='./db'):
 def get_llm(openai_key):
     return ChatOpenAI(api_key=openai_key, model="gpt-4o-mini", temperature=0.5)
 
-def run_rag(user_query: str, vectorstore, k: int = 5, conn = None,answer_tpl = None,openai_key = None) -> str:
+async def run_rag(user_query: str, vectorstore, k: int = 5, conn = None,answer_tpl = None,openai_key = None) -> str:
     # 1) 검색어 재작성
     #search_query = rewrite_query(user_query)
     #print("   ↪ 검색어:", search_query)
@@ -224,10 +225,70 @@ def run_rag(user_query: str, vectorstore, k: int = 5, conn = None,answer_tpl = N
     llm = get_llm(openai_key)
     print("🔄 답변 생성(LLM) …", end=" ")
     start = time.perf_counter()
-    resp = llm.invoke(answer)
+    
+    # 스트리밍하면서 내용을 모아서 리턴
+    full_response = ""
+    async for chunk in llm.astream(answer):
+        content = chunk.content
+        if content:
+            print(content, end="", flush=True)
+            full_response += str(content)
+    
     print(f"✔ ({time.perf_counter()-start:.1f}s)")
     
-    return resp.content.strip() if hasattr(resp, "content") else resp.strip()
+    return full_response.strip()
+
+async def run_rag_stream(user_query: str, vectorstore, k: int = 5, conn = None, answer_tpl = None, openai_key = None):
+    """스트리밍 방식으로 답변을 생성하는 함수 - 각 청크를 yield"""
+    # 1) 검색어 재작성
+    print("DB 검색 중...")
+    results = retrieve_db(
+        user_query,
+        conn,
+        vectorstore,
+        k=k
+    )
+
+    # 3) 검색 결과 처리 및 템플릿 적용
+    if not results or len(results) == 0:
+        yield "유사 판례를 찾지 못했습니다."
+        return
+
+    # 상위 k개 결과 모두 병합
+    contexts = []
+    full_documents = []
+
+    for i, item in enumerate(results):
+        # 각 결과에서 필요한 정보 추출
+        contexts.append(f"{i+1}. {item['유사문단']} [판례번호:{item['판례일련번호']}]")
+        full_documents.append(f"--- 문서 {i+1} ---\n{item['전문']}")
+
+    answer = answer_tpl.render(
+        context1=results[0]['유사문단'] + f" [판례번호:{results[0]['판례일련번호']}]",
+        full1=results[0]['전문'],
+        context2=results[1]['유사문단'] + f" [판례번호:{results[1]['판례일련번호']}]",
+        full2=results[1]['전문'],
+        context3=results[2]['유사문단'] + f" [판례번호:{results[2]['판례일련번호']}]",
+        full3=results[2]['전문'],
+        context4=results[3]['유사문단'] + f" [판례번호:{results[3]['판례일련번호']}]",
+        full4=results[3]['전문'],
+        context5=results[4]['유사문단'] + f" [판례번호:{results[4]['판례일련번호']}]",
+        full5=results[4]['전문'],
+        user_query=user_query
+    )
+
+    llm = get_llm(openai_key)
+    
+    # 스트리밍하면서 각 청크를 yield
+    async for chunk in llm.astream(answer):
+        if not hasattr(run_rag_stream, '_first_chunk_printed'):
+            print("📌 답변 \n", end="", flush=True)
+            run_rag_stream._first_chunk_printed = True
+        content = chunk.content
+        if content:
+            #print(content, end="", flush=True)
+            yield str(content)
+
 
 def setup_db(base_db_dir='./db'):
     cuda_available = torch.cuda.is_available()
