@@ -220,14 +220,17 @@ def run_rag(user_query: str, vectorstore, k: int = 5, conn = None,answer_tpl = N
         user_query=user_query
     )
 
-    
     llm = get_llm(openai_key)
     print("🔄 답변 생성(LLM) …", end=" ")
     start = time.perf_counter()
     resp = llm.invoke(answer)
     print(f"✔ ({time.perf_counter()-start:.1f}s)")
-    
-    return resp.content.strip() if hasattr(resp, "content") else resp.strip()
+
+    # ''' '''로 감싸진 답변이면 제거
+    content = resp.content.strip() if hasattr(resp, "content") else resp.strip()
+    if content.startswith("'''") and content.endswith("'''"):
+        content = content[3:-3].strip()
+    return content
 
 def setup_db(base_db_dir='./db'):
     cuda_available = torch.cuda.is_available()

@@ -8,3 +8,4 @@ VecDB/db/
 VecDB/판례.csv
 __pycache__/
 db.zip
+.DS_Store
