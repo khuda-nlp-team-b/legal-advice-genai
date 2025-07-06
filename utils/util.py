@@ -237,6 +237,9 @@ async def run_rag(user_query: str, vectorstore, k: int = 5, conn = None,answer_t
 
     # ''' '''로 감싸진 답변이면 제거
     content = full_response.strip()
+    if content.startswith("'''") and content.endswith("'''"):
+        content = content[3:-3].strip()
+    return content
 
 async def run_rag_stream(user_query: str, vectorstore, k: int = 5, conn = None, answer_tpl = None, openai_key = None):
     """스트리밍 방식으로 답변을 생성하는 함수 - 각 청크를 yield"""
@@ -289,9 +292,8 @@ async def run_rag_stream(user_query: str, vectorstore, k: int = 5, conn = None, 
             #print(content, end="", flush=True)
             yield str(content)
 
-    if content.startswith("'''") and content.endswith("'''"):
-        content = content[3:-3].strip()
-    return content
+    # content 변수가 정의되지 않았으므로 제거
+    # async generator에서는 return 값을 가질 수 없음
 
 def setup_db(base_db_dir='./db'):
     cuda_available = torch.cuda.is_available()

@@ -23,7 +23,7 @@ class AskRequest(BaseModel):
     question: str
 
 @app.post("/api/ask")
-def ask(req: AskRequest):
+async def ask(req: AskRequest):
     conn = pymysql.connect(
         host=os.environ['DB_HOST'],
         port=int(os.environ.get('DB_PORT', 3306)),
@@ -36,7 +36,7 @@ def ask(req: AskRequest):
     vectorstore = u.setup_db(base_db_dir='./db')
     with open('prompts/answer_synth.j2', encoding='utf-8') as f:
         answer_tpl = Template(f.read())
-    answer = u.run_rag(
+    answer = await u.run_rag(
         user_query=req.question,
         vectorstore=vectorstore,
         k=5,
