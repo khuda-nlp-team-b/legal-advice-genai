@@ -49,48 +49,70 @@ const ChatPage: React.FC = () => {
       };
       setMessages((prev) => [...prev, userMessage]);
       (async () => {
-        // 단일 로딩 메시지
+        // 스트리밍 답변 메시지 생성 (id에 'ai-' prefix)
+        const streamingMessageId = "ai-" + Date.now().toString();
         setMessages((prev) => [
           ...prev,
           {
-            id: `loading-initial`,
-            text: "답변 생성 중입니다...",
+            id: streamingMessageId,
+            text: "",
             isUser: false,
             timestamp: new Date(),
-            isLoading: true,
           },
         ]);
+
         try {
           const response = await fetch("http://localhost:8000/api/ask", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ question: userMessage.text }),
           });
-          const data = await response.json();
-          setMessages((prev) =>
-            prev
-              .filter((msg) => !msg.isLoading)
-              .concat([
-                {
-                  id: Date.now().toString(),
-                  text: data.answer,
-                  isUser: false,
-                  timestamp: new Date(),
-                },
-              ])
-          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              const chunk = decoder.decode(value);
+              const lines = chunk.split("\n");
+
+              for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.chunk) {
+                      setMessages((prev) =>
+                        prev.map((msg) =>
+                          msg.id === streamingMessageId
+                            ? { ...msg, text: msg.text + data.chunk }
+                            : msg
+                        )
+                      );
+                    }
+                  } catch (e) {
+                    console.error("JSON parse error:", e);
+                  }
+                }
+              }
+            }
+          }
         } catch (err) {
           setMessages((prev) =>
-            prev
-              .filter((msg) => !msg.isLoading)
-              .concat([
-                {
-                  id: Date.now().toString(),
-                  text: "⚠️ 답변 생성 중 오류가 발생했습니다. 다시 시도해 주세요.",
-                  isUser: false,
-                  timestamp: new Date(),
-                },
-              ])
+            prev.map((msg) =>
+              msg.id === streamingMessageId
+                ? {
+                    ...msg,
+                    text: "⚠️ 답변 생성 중 오류가 발생했습니다. 다시 시도해 주세요.",
+                  }
+                : msg
+            )
           );
         }
         navigate(location.pathname, { replace: true, state: {} });
@@ -193,48 +215,71 @@ const ChatPage: React.FC = () => {
     };
     setMessages((prev) => [...prev, userMessage]);
     setInputText("");
-    // 단일 로딩 메시지
+
+    // AI 답변(받는 메시지)만 스트리밍 메시지로 추가 (id에 'ai-' prefix)
+    const streamingMessageId = "ai-" + Date.now().toString();
     setMessages((prev) => [
       ...prev,
       {
-        id: `loading`,
-        text: "답변 생성 중입니다...",
+        id: streamingMessageId,
+        text: "",
         isUser: false,
         timestamp: new Date(),
-        isLoading: true,
       },
     ]);
+
     try {
       const response = await fetch("http://localhost:8000/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: userMessage.text }),
       });
-      const data = await response.json();
-      setMessages((prev) =>
-        prev
-          .filter((msg) => !msg.isLoading)
-          .concat([
-            {
-              id: Date.now().toString(),
-              text: data.answer,
-              isUser: false,
-              timestamp: new Date(),
-            },
-          ])
-      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.chunk) {
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === streamingMessageId
+                        ? { ...msg, text: msg.text + data.chunk }
+                        : msg
+                    )
+                  );
+                }
+              } catch (e) {
+                console.error("JSON parse error:", e);
+              }
+            }
+          }
+        }
+      }
     } catch (err) {
       setMessages((prev) =>
-        prev
-          .filter((msg) => !msg.isLoading)
-          .concat([
-            {
-              id: Date.now().toString(),
-              text: "⚠️ 답변 생성 중 오류가 발생했습니다. 다시 시도해 주세요.",
-              isUser: false,
-              timestamp: new Date(),
-            },
-          ])
+        prev.map((msg) =>
+          msg.id === streamingMessageId
+            ? {
+                ...msg,
+                text: "⚠️ 답변 생성 중 오류가 발생했습니다. 다시 시도해 주세요.",
+              }
+            : msg
+        )
       );
     }
   };

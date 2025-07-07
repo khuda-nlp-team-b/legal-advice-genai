@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from utils import util as u
 import os
@@ -6,6 +7,7 @@ from dotenv import load_dotenv
 import pymysql
 from jinja2 import Template
 from fastapi.middleware.cors import CORSMiddleware
+import json
 
 app = FastAPI()
 load_dotenv()
@@ -59,15 +61,32 @@ async def ask(req: AskRequest):
     )
     vectorstore = get_vectorstore()  # 한 번만 초기화된 벡터스토어 사용
     answer_tpl = get_answer_template()  # 한 번만 로드된 템플릿 사용
-    answer = await u.run_rag(
-        user_query=req.question,
-        vectorstore=vectorstore,
-        k=5,
-        conn=conn,
-        answer_tpl=answer_tpl,
-        openai_key=os.environ['OPENAI_API_KEY']
+    
+    async def generate_stream():
+        try:
+            async for chunk in u.run_rag_stream(
+                user_query=req.question,
+                vectorstore=vectorstore,
+                k=5,
+                conn=conn,
+                answer_tpl=answer_tpl,
+                openai_key=os.environ['OPENAI_API_KEY']
+            ):
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            conn.close()
+    
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream",
+        }
     )
-    return {"answer": answer}
 
 @app.post("/api/case")
 async def get_case_info(req: CaseRequest):
