@@ -31,7 +31,7 @@
 ## 3️⃣ 백엔드 / 프론트엔드<br>
 
 # 🎥 시연 결과
-![image](https://github.com/user-attachments/assets/76d3ce0d-9578-4ad7-a9bc-ab28455457b0)
+![image](https://github.com/user-attachments/assets/0a35c706-6d9b-4104-a95b-929461a734e4)
 
 # ✔️ 결론
 
