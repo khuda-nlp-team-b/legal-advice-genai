@@ -7,7 +7,7 @@ import pymysql
 import os
 import warnings
 import chromadb
-from langchain.embeddings import SentenceTransformerEmbeddings
+from langchain_community.embeddings import SentenceTransformerEmbeddings
 import torch
 import time
 from datetime import datetime, timedelta
@@ -18,6 +18,8 @@ from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 import asyncio
+from langchain.chains import ConversationChain  
+from langchain.memory import ConversationBufferMemory
 
 # LangChain 텔레메트리 비활성화
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
@@ -119,11 +121,11 @@ def multiquery_retrieve_db(query,host,port,username,password,db_name,base_db_dir
     return output
 
     
-def retrieve_db(query,conn,vectorstore,k=1):
+def retrieve_db(query,conn,vectorstore,k=1,threshold=0.0):
     
     retriever = vectorstore.as_retriever(
         search_type="mmr", 
-        search_kwargs={"k": k, "fetch_k": 20, "lambda_mult": 0.85},
+        search_kwargs={"k": k, "fetch_k": 20, "lambda_mult": 0.85, "score_threshold": threshold},
         return_metadata=True
     )
     
@@ -185,6 +187,28 @@ def delete_collection(collection_name, base_db_dir='./db'):
 def get_llm(openai_key):
     return ChatOpenAI(api_key=openai_key, model="gpt-4o-mini", temperature=0.5)
 
+def docs2tpl(results,answer_tpl,user_query,k=5):
+    contexts = []
+    full_documents = []
+    for i, item in enumerate(results[:k]):
+        contexts.append(f"{i+1}. {item['유사문단']} [판례번호:{item['판례일련번호']}]")
+        full_documents.append(f"--- 문서 {i+1} ---\n{item['전문']}")
+
+    # k개에 맞게 동적으로 렌더링
+    render_data = {'user_query': user_query}
+    
+    for i in range(k):
+        if i < len(results):
+            render_data[f'context{i+1}'] = results[i]['유사문단'] + f" [판례번호:{results[i]['판례일련번호']}]"
+            render_data[f'full{i+1}'] = results[i]['전문']
+        else:
+            # k개보다 적은 결과가 있는 경우 빈 문자열로 채움
+            render_data[f'context{i+1}'] = ""
+            render_data[f'full{i+1}'] = ""
+    
+    answer = answer_tpl.render(**render_data)
+    return answer
+
 async def run_rag(user_query: str, vectorstore, k: int = 5, conn = None,answer_tpl = None,openai_key = None) -> str:
     # 1) 검색어 재작성
     #search_query = rewrite_query(user_query)
@@ -204,27 +228,7 @@ async def run_rag(user_query: str, vectorstore, k: int = 5, conn = None,answer_t
         return "유사 판례를 찾지 못했습니다."
 
     # 상위 k개 결과 모두 병합
-    contexts = []
-    full_documents = []
-
-    for i, item in enumerate(results):
-        # 각 결과에서 필요한 정보 추출
-        contexts.append(f"{i+1}. {item['유사문단']} [판례번호:{item['판례일련번호']}]")
-        full_documents.append(f"--- 문서 {i+1} ---\n{item['전문']}")
-
-    answer = answer_tpl.render(
-        context1=results[0]['유사문단'] + f" [판례번호:{results[0]['판례일련번호']}]",
-        full1=results[0]['전문'],
-        context2=results[1]['유사문단'] + f" [판례번호:{results[1]['판례일련번호']}]",
-        full2=results[1]['전문'],
-        context3=results[2]['유사문단'] + f" [판례번호:{results[2]['판례일련번호']}]",
-        full3=results[2]['전문'],
-        context4=results[3]['유사문단'] + f" [판례번호:{results[3]['판례일련번호']}]",
-        full4=results[3]['전문'],
-        context5=results[4]['유사문단'] + f" [판례번호:{results[4]['판례일련번호']}]",
-        full5=results[4]['전문'],
-        user_query=user_query
-    )
+    answer = docs2tpl(results,answer_tpl,user_query)
 
     llm = get_llm(openai_key)
     print("🔄 답변 생성(LLM) …", end=" ")
@@ -262,28 +266,7 @@ async def run_rag_stream(user_query: str, vectorstore, k: int = 5, conn = None, 
         yield "유사 판례를 찾지 못했습니다."
         return
 
-    # 상위 k개 결과 모두 병합
-    contexts = []
-    full_documents = []
-
-    for i, item in enumerate(results):
-        # 각 결과에서 필요한 정보 추출
-        contexts.append(f"{i+1}. {item['유사문단']} [판례번호:{item['판례일련번호']}]")
-        full_documents.append(f"--- 문서 {i+1} ---\n{item['전문']}")
-
-    answer = answer_tpl.render(
-        context1=results[0]['유사문단'] + f" [판례번호:{results[0]['판례일련번호']}]",
-        full1=results[0]['전문'],
-        context2=results[1]['유사문단'] + f" [판례번호:{results[1]['판례일련번호']}]",
-        full2=results[1]['전문'],
-        context3=results[2]['유사문단'] + f" [판례번호:{results[2]['판례일련번호']}]",
-        full3=results[2]['전문'],
-        context4=results[3]['유사문단'] + f" [판례번호:{results[3]['판례일련번호']}]",
-        full4=results[3]['전문'],
-        context5=results[4]['유사문단'] + f" [판례번호:{results[4]['판례일련번호']}]",
-        full5=results[4]['전문'],
-        user_query=user_query
-    )
+    answer = docs2tpl(results,answer_tpl,user_query)
 
     llm = get_llm(openai_key)
     
@@ -299,6 +282,35 @@ async def run_rag_stream(user_query: str, vectorstore, k: int = 5, conn = None, 
 
     # content 변수가 정의되지 않았으므로 제거
     # async generator에서는 return 값을 가질 수 없음
+
+def set_conversation(query,answer,model):
+    memory = ConversationBufferMemory()
+    conversation = ConversationChain( 
+        llm=model,
+        memory=memory,
+        verbose=True
+    )
+    memory.save_context({'input':query},{'output':answer})
+    return conversation
+
+async def run_conversation(conversation,user_query,vectorstore,conn,k=5,answer_tpl=None,openai_key=None):
+    print("DB 검색 중...")
+    results = retrieve_db(
+        user_query,
+        conn,
+        vectorstore,
+        k=k,
+        threshold=0.7
+    )
+    
+    answer = docs2tpl(results,answer_tpl,user_query,k=3)
+    
+    async for chunk in conversation.astream(answer):
+        # ConversationChain.astream() returns dictionaries with 'response' key
+        if isinstance(chunk, dict) and 'response' in chunk:
+            content = chunk['response']
+            if content:
+                yield str(content)
 
 def setup_db(base_db_dir='./db'):
     cuda_available = torch.cuda.is_available()
