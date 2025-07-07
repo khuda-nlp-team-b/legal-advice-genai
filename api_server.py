@@ -48,6 +48,12 @@ class AskRequest(BaseModel):
 class CaseRequest(BaseModel):
     caseNumber: str
 
+@app.on_event("startup")
+async def on_startup():
+    # 서버가 켜질 때 한 번만 실행됨
+    get_vectorstore()
+    get_answer_template()
+
 @app.post("/api/ask")
 async def ask(req: AskRequest):
     conn = pymysql.connect(
