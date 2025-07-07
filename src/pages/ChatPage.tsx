@@ -11,6 +11,8 @@ interface Message {
   feedback?: boolean | null;
 }
 
+const API_BASE_URL = "http://43.201.7.64:8000";
+
 const ChatPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -62,7 +64,7 @@ const ChatPage: React.FC = () => {
         ]);
 
         try {
-          const response = await fetch("http://localhost:8000/api/ask", {
+          const response = await fetch(`${API_BASE_URL}/api/ask`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ question: userMessage.text }),
@@ -155,7 +157,7 @@ const ChatPage: React.FC = () => {
     ]);
 
     try {
-      const response = await fetch("http://localhost:8000/api/case", {
+      const response = await fetch(`${API_BASE_URL}/api/case`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ caseNumber }),
@@ -229,7 +231,7 @@ const ChatPage: React.FC = () => {
     ]);
 
     try {
-      const response = await fetch("http://localhost:8000/api/ask", {
+      const response = await fetch(`${API_BASE_URL}/api/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: userMessage.text }),
