@@ -9,6 +9,7 @@ export default function QuestionInputPage() {
   const handleSubmit = () => {
     if (!query.trim()) return;
 
+<<<<<<< HEAD
     // Mock 결과
     const result = {
       summary: "택배기사의 과실로 인한 물건 파손 사건과 유사",
@@ -51,6 +52,10 @@ export default function QuestionInputPage() {
     localStorage.setItem("lawgpt_history", JSON.stringify([historyEntry, ...history]));
 
     navigate("/result", { state: { query, result } });
+=======
+    // 채팅 페이지로 이동하면서 초기 질문 전달
+    navigate("/chat", { state: { initialQuestion: query } });
+>>>>>>> 37c4389 (배포 전 로컬 테스트 완료)
   };
 
   return (
@@ -61,7 +66,13 @@ export default function QuestionInputPage() {
         className="w-40 h-40 object-contain"
       />
       <h2 className="text-2xl font-bold text-center text-gray-800">
+<<<<<<< HEAD
         당신의 작고 소중한 법률 요정 우드저지에요.<br />어떤 사건을 도와드릴까요~?
+=======
+        당신의 작고 소중한 법률 요정 우드저지에요.
+        <br />
+        어떤 사건을 도와드릴까요~?
+>>>>>>> 37c4389 (배포 전 로컬 테스트 완료)
       </h2>
       <div className="w-full max-w-xl bg-gray-100 rounded-2xl shadow px-4 py-3 flex items-center">
         <input

@@ -7,4 +7,9 @@ db/
 VecDB/db/
 VecDB/판례.csv
 __pycache__/
+<<<<<<< HEAD
 db.zip
+=======
+db.zip
+.DS_Store
+>>>>>>> 37c4389 (배포 전 로컬 테스트 완료)
