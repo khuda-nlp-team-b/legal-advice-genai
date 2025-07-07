@@ -19,6 +19,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 전역 변수로 벡터스토어와 템플릿 저장 (한 번만 초기화)
+_vectorstore = None
+_answer_template = None
+
+def get_vectorstore():
+    global _vectorstore
+    if _vectorstore is None:
+        print("🔄 벡터스토어 초기화 중...")
+        _vectorstore = u.setup_db(base_db_dir='./db')
+        print("✅ 벡터스토어 초기화 완료")
+    return _vectorstore
+
+def get_answer_template():
+    global _answer_template
+    if _answer_template is None:
+        print("📝 답변 템플릿 로드 중...")
+        with open('prompts/answer_synth.j2', encoding='utf-8') as f:
+            _answer_template = Template(f.read())
+        print("✅ 답변 템플릿 로드 완료")
+    return _answer_template
+
 class AskRequest(BaseModel):
     question: str
 
@@ -36,9 +57,8 @@ async def ask(req: AskRequest):
         charset='utf8',
         cursorclass=pymysql.cursors.DictCursor
     )
-    vectorstore = u.setup_db(base_db_dir='./db')
-    with open('prompts/answer_synth.j2', encoding='utf-8') as f:
-        answer_tpl = Template(f.read())
+    vectorstore = get_vectorstore()  # 한 번만 초기화된 벡터스토어 사용
+    answer_tpl = get_answer_template()  # 한 번만 로드된 템플릿 사용
     answer = await u.run_rag(
         user_query=req.question,
         vectorstore=vectorstore,
